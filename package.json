@@ -1,7 +1,7 @@
 {
   "name": "gestor-cotizaciones-maquipan",
   "version": "1.0.0",
-  "description": "Sistema automático de envío de cotizaciones",
+  "description": "Sistema automático de cotizaciones para Maquipan",
   "main": "api/enviar_correo.js",
   "dependencies": {
     "nodemailer": "^6.9.13"
