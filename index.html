@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor Maquipan - Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root { --primary: #0056b3; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; width: 100%; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: var(--primary); margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        label { font-weight: bold; display: block; margin-top: 12px; font-size: 0.9rem; }
+        input, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .carga-pdf { border: 2px dashed var(--primary); background: #eef6ff; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 15px; }
+        
+        .preview-container { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 0.85rem; color: #333; height: 420px; overflow-y: auto; }
+        .preview-header { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid var(--primary); font-size: 0.85rem; line-height: 1.6; }
+        .preview-header strong { color: #555; width: 60px; display: inline-block; }
+        
+        .btn-enviar { background: var(--primary); color: white; border: none; padding: 15px; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        #log-status { font-size: 0.8rem; color: #666; margin-top: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="main-grid">
+    <div class="card">
+        <h2>🛠 Configuración Maquipan</h2>
+        <div class="carga-pdf" onclick="document.getElementById('archivoPdf').click()">
+            <span id="label-archivo">📁 Cargar Cotización PDF</span>
+            <input type="file" id="archivoPdf" accept=".pdf" style="display:none" onchange="procesarArchivo(this)">
+            <div id="log-status">Esperando archivo...</div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1">
+                <label>N° Cotización</label>
+                <input type="text" id="numCotizacion" oninput="actualizarVista()">
+            </div>
+            <div style="flex:2">
+                <label>Local (Asunto)</label>
+                <input type="text" id="nombreLocal" oninput="actualizarVista()">
+            </div>
+        </div>
+
+        <label>Correo Cliente</label>
+        <input type="email" id="emailDestino" placeholder="cliente@ejemplo.cl" oninput="actualizarVista()">
+
+        <label>Texto extra en Asunto</label>
+        <input type="text" id="textoAdicional" placeholder="Ej: Urgente" oninput="actualizarVista()">
+
+        <label>Repuestos Filtrados (>$7.000)</label>
+        <textarea id="listaRepuestos" rows="6" oninput="actualizarVista()"></textarea>
+
+        <button class="btn-enviar" id="btnEnviar" onclick="enviarCorreo()">ENVIAR POR GMAIL</button>
+    </div>
+
+    <div class="card">
+        <h2>👁 Previsualización del Envío</h2>
+        
+        <div class="preview-header">
+            <div><strong>Asunto:</strong> <span id="prevAsunto"></span></div>
+            <div><strong>Para:</strong> <span id="prevPara"></span></div>
+            <div><strong>CC:</strong> <span>cpimentel@maquipan.cl, emorales@maquipan.cl, jvillarroel@maquipan.cl, kcarrasco@maquipan.cl</span></div>
+        </div>
+
+        <div id="previewCuerpo" class="preview-container"></div>
+    </div>
+</div>
+
+<script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+    let pdfBase64 = null;
+    let nombreArchivo = "";
+    const correosCC = "cpimentel@maquipan.cl, emorales@maquipan.cl, jvillarroel@maquipan.cl, kcarrasco@maquipan.cl";
+
+    async function procesarArchivo(input) {
+        const file = input.files[0];
+        const status = document.getElementById('log-status');
+        if (!file) return;
+        
+        status.innerText = "⏳ Extrayendo y resaltando...";
+        nombreArchivo = file.name;
+
+        try {
+            const reader = new FileReader();
+            reader.onload = e => pdfBase64 = e.target.result;
+            reader.readAsDataURL(file);
+
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            const page = await pdf.getPage(1);
+            const content = await page.getTextContent();
+            const items = content.items;
+            const fullText = items.map(i => i.str).join(" ");
+
+            // 1. N° COTIZACIÓN
+            const cotMatch = fullText.match(/COTIZACI[OÓ]N:\s*(\d+)/i);
+            if (cotMatch) document.getElementById('numCotizacion').value = cotMatch[1];
+
+            // 2. LOCAL
+            const localMatch = fullText.match(/MAIL:.*?@[a-z.]+\s+(.*?)(?=\s+["']?Código["']?)/i);
+            const localName = localMatch ? localMatch[1].trim() : "";
+            document.getElementById('nombreLocal').value = localName;
+
+            // 3. REPUESTOS (Con Negritas en el nombre)
+            let repuestosFinales = [];
+            const palabrasProhibidas = ["TOTAL", "NETO", "IVA", "DESCUENTO", "SUB", "CÓDIGO", "CANTIDAD", "VALOR", "U. MED"];
+
+            for (let i = 0; i < items.length; i++) {
+                let texto = items[i].str.trim();
+                if (texto.match(/^\d{1,3}([.,]\d{3})+$/)) {
+                    let valorNumeric = parseInt(texto.replace(/[.,]/g, ''));
+                    if (valorNumeric >= 7000) {
+                        let nombreCompleto = "";
+                        let j = i - 1;
+                        let maxRetroceso = 0;
+                        while (j >= 0 && maxRetroceso < 4) {
+                            let palabra = items[j].str.trim();
+                            if (palabra.match(/^\d+$/) && palabra.length < 5) break;
+                            if (palabrasProhibidas.some(p => palabra.toUpperCase().includes(p))) break;
+                            if (palabra === localName) break;
+                            if (palabra.length > 2) nombreCompleto = palabra + " " + nombreCompleto;
+                            j--; maxRetroceso++;
+                        }
+                        if (nombreCompleto.trim().length > 5) {
+                            // Añadimos negritas al repuesto
+                            repuestosFinales.push("• **" + nombreCompleto.trim() + "**");
+                        }
+                    }
+                }
+            }
+
+            document.getElementById('listaRepuestos').value = [...new Set(repuestosFinales)].join("\n");
+            status.innerText = "✅ Datos cargados correctamente";
+            actualizarVista();
+
+        } catch (error) {
+            status.innerText = "❌ Error en el PDF";
+        }
+    }
+
+    function actualizarVista() {
+        const cot = document.getElementById('numCotizacion').value || "____";
+        const local = document.getElementById('nombreLocal').value || "____";
+        const extra = document.getElementById('textoAdicional').value;
+        const repuestos = document.getElementById('listaRepuestos').value || "";
+        const destino = document.getElementById('emailDestino').value || "___@___";
+
+        let asunto = `COT. ${cot} ${local}`;
+        if (extra.trim()) asunto += ` - ${extra}`;
+        
+        document.getElementById('prevAsunto').innerText = asunto;
+        document.getElementById('prevPara').innerText = destino;
+
+        // CUERPO CON NEGRITAS (**texto**)
+        let cuerpo = `Estimado/a,\n\n`;
+        cuerpo += `Espero que se encuentre muy bien.\n\n`;
+        cuerpo += `De acuerdo con nuestra revisión técnica y con el objetivo de asegurar el *ÓPTIMO FUNCIONAMIENTO* de sus equipos en el local **${local}**, le adjunto la cotización correspondiente a los repuestos y/o servicios requeridos.\n\n`;
+        cuerpo += `📄 *DETALLES DE LA COTIZACIÓN:*\n`;
+        cuerpo += `• N° de Cotización: **${cot}**\n\n`;
+        cuerpo += `🔧 *REPUESTOS Y SERVICIOS INCLUIDOS:*\n`;
+        cuerpo += `${repuestos}\n\n`;
+        cuerpo += `Para poder avanzar con la gestión y agendar los trabajos a la brevedad, le agradecería que, en caso de estar conforme, nos pueda emitir la **ORDEN DE COMPRA (OC)** correspondiente.\n\n`;
+        cuerpo += `Quedo a su entera disposición por si tiene alguna duda técnica o requiere mayor información sobre esta cotización.\n\n`;
+        cuerpo += `Saludos cordiales,\n\n**Cristian**\nSupervisor de Servicio Técnico\n**Maquipan**`;
+
+        document.getElementById('previewCuerpo').innerText = cuerpo;
+    }
+
+    async function enviarCorreo() {
+        const btn = document.getElementById('btnEnviar');
+        const destino = document.getElementById('emailDestino').value;
+        if (!destino) return alert("Ingresa el correo del cliente.");
+
+        btn.disabled = true;
+        btn.innerText = "🚀 Enviando...";
+
+        try {
+            const res = await fetch('/api/enviar_correo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    destino: destino,
+                    cc: correosCC,
+                    asunto: document.getElementById('prevAsunto').innerText,
+                    cuerpo: document.getElementById('previewCuerpo').innerText,
+                    adjunto: pdfBase64,
+                    nombreArchivo: nombreArchivo
+                })
+            });
+            if (res.ok) alert("✅ ¡Correo enviado!"); else alert("❌ Error");
+        } catch (e) { alert("❌ Error de red"); }
+        finally { btn.disabled = false; btn.innerText = "ENVIAR POR GMAIL"; }
+    }
+    actualizarVista();
+</script>
+</body>
+</html>
