@@ -1,41 +1,46 @@
 const nodemailer = require('nodemailer');
 
 export default async function handler(req, res) {
-  // Cabeceras CORS para evitar bloqueos
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    // Permitimos peticiones desde tu interfaz
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Usar POST' });
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  const { destino, cc, asunto, cuerpoHtml, adjunto, nombreArchivo } = req.body;
+    // Fíjate que ahora recibimos "cuerpoHtml" en lugar de "cuerpo"
+    const { destino, cc, asunto, cuerpoHtml, adjunto, nombreArchivo } = req.body;
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_PASS
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.GMAIL_USER, 
+            pass: process.env.GMAIL_PASS  
+        }
+    });
+
+    try {
+        const mailOptions = {
+            from: `"Cristian - Maquipan" <${process.env.GMAIL_USER}>`,
+            to: destino,
+            cc: cc,
+            subject: asunto,
+            html: cuerpoHtml, // <-- ESTO ES LO QUE OBLIGA A GMAIL A MOSTRAR LAS NEGRITAS
+            attachments: adjunto ? [
+                {
+                    filename: nombreArchivo || 'cotizacion.pdf',
+                    content: adjunto.split("base64,")[1], 
+                    encoding: 'base64'
+                }
+            ] : []
+        };
+
+        await transporter.sendMail(mailOptions);
+        return res.status(200).json({ mensaje: '¡Correo enviado con éxito!' });
+
+    } catch (error) {
+        console.error('Error detallado:', error);
+        return res.status(500).json({ error: 'Error al enviar el correo', detalle: error.message });
     }
-  });
-
-  try {
-    const mailOptions = {
-      from: `"Cristian - Maquipan" <${process.env.GMAIL_USER}>`,
-      to: destino,
-      cc: cc,
-      subject: asunto,
-      html: cuerpoHtml, // <-- CAMBIADO A HTML para que se vea el formato
-      attachments: adjunto ? [{
-        filename: nombreArchivo || 'Cotizacion.pdf',
-        content: adjunto.split("base64,")[1],
-        encoding: 'base64'
-      }] : []
-    };
-
-    await transporter.sendMail(mailOptions);
-    return res.status(200).json({ mensaje: 'Enviado' });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
 }
