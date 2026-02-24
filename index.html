@@ -140,7 +140,7 @@
         }
     }
 
-    function actualizarVista() {
+function actualizarVista() {
         const cot = document.getElementById('numCotizacion').value || "____";
         const local = document.getElementById('nombreLocal').value || "____";
         const extra = document.getElementById('textoAdicional').value;
@@ -186,10 +186,10 @@
             </div>
         `;
 
-        // Mostramos el HTML en la vista previa y lo guardamos para enviarlo
+        // EL CAMBIO ESTÁ AQUÍ: Usamos innerHTML en lugar de innerText
         document.getElementById('previewCuerpo').innerHTML = cuerpoHtml;
-        window.cuerpoParaEnviar = cuerpoHtml; 
-    }
+        window.cuerpoParaEnviar = cuerpoHtml; // Guardamos el HTML para el envío
+    }}
 
     async function enviarCorreo() {
         const btn = document.getElementById('btnEnviar');
@@ -220,3 +220,4 @@
 </script>
 </body>
 </html>
+
