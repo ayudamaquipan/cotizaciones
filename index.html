@@ -15,7 +15,7 @@
         input, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
         .carga-pdf { border: 2px dashed var(--primary); background: #eef6ff; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 15px; }
         
-        .preview-container { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; color: #333; height: 480px; overflow-y: auto; }
+        .preview-container { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; font-family: Arial, sans-serif; font-size: 0.9rem; color: #333; height: 420px; overflow-y: auto; }
         .preview-header { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid var(--primary); font-size: 0.85rem; line-height: 1.6; }
         .preview-header strong { color: #555; width: 60px; display: inline-block; }
         
@@ -111,9 +111,9 @@
             for (let i = 0; i < items.length; i++) {
                 let texto = items[i].str.trim();
                 if (texto.match(/^\d{1,3}([.,]\d{3})+$/)) {
-                    let valor = parseInt(texto.replace(/[.,]/g, ''));
-                    if (valor >= 7000) {
-                        let nombre = "";
+                    let valorNumeric = parseInt(texto.replace(/[.,]/g, ''));
+                    if (valorNumeric >= 7000) {
+                        let nombreCompleto = "";
                         let j = i - 1;
                         let maxRetroceso = 0;
                         while (j >= 0 && maxRetroceso < 4) {
@@ -121,11 +121,11 @@
                             if (palabra.match(/^\d+$/) && palabra.length < 5) break;
                             if (excluidas.some(p => palabra.toUpperCase().includes(p))) break;
                             if (palabra === localName) break;
-                            if (palabra.length > 2) nombre = palabra + " " + nombre;
+                            if (palabra.length > 2) nombreCompleto = palabra + " " + nombreCompleto;
                             j--; maxRetroceso++;
                         }
-                        if (nombre.trim().length > 3) {
-                            repuestosFinales.push(nombre.trim());
+                        if (nombreCompleto.trim().length > 5) {
+                            repuestosFinales.push(nombreCompleto.trim());
                         }
                     }
                 }
@@ -137,10 +137,11 @@
 
         } catch (error) {
             status.innerText = "❌ Error en el PDF";
+            console.error(error);
         }
     }
 
-function actualizarVista() {
+    function actualizarVista() {
         const cot = document.getElementById('numCotizacion').value || "____";
         const local = document.getElementById('nombreLocal').value || "____";
         const extra = document.getElementById('textoAdicional').value;
@@ -153,14 +154,12 @@ function actualizarVista() {
         document.getElementById('prevAsunto').innerText = asunto;
         document.getElementById('prevPara').innerText = destino;
 
-        // Armamos la lista de repuestos en HTML real
         let listaRepuestosHtml = "";
         repuestos.forEach(r => {
             let limpio = r.replace(/^[•\-\*]+/, '').trim();
             listaRepuestosHtml += `<li style="margin-bottom: 5px;"><b>${limpio}</b></li>`;
         });
 
-        // CUERPO CON DISEÑO HTML REAL
         let cuerpoHtml = `
             <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 650px;">
                 <p>Estimado/a,</p>
@@ -186,10 +185,10 @@ function actualizarVista() {
             </div>
         `;
 
-        // EL CAMBIO ESTÁ AQUÍ: Usamos innerHTML en lugar de innerText
+        // Aquí usamos innerHTML para renderizar el formato HTML
         document.getElementById('previewCuerpo').innerHTML = cuerpoHtml;
-        window.cuerpoParaEnviar = cuerpoHtml; // Guardamos el HTML para el envío
-    }}
+        window.cuerpoParaEnviar = cuerpoHtml; 
+    }
 
     async function enviarCorreo() {
         const btn = document.getElementById('btnEnviar');
@@ -207,7 +206,7 @@ function actualizarVista() {
                     destino: destino,
                     cc: correosCC,
                     asunto: document.getElementById('prevAsunto').innerText,
-                    cuerpoHtml: window.cuerpoParaEnviar, // AQUÍ ENVIAMOS EL HTML
+                    cuerpoHtml: window.cuerpoParaEnviar,
                     adjunto: pdfBase64,
                     nombreArchivo: nombreArchivo
                 })
@@ -220,4 +219,3 @@ function actualizarVista() {
 </script>
 </body>
 </html>
-
